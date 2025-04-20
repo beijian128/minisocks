@@ -20,7 +20,7 @@ jobs:
           check-latest: false  # 禁用自动更新，确保版本精确
 
       - name: Install GoReleaser
-        run: go install github.com/goreleaser/goreleaser@v1.24.1
+        run: go install github.com/goreleaser/goreleaser@latest
 
       - name: Run GoReleaser
         run: goreleaser release --clean
