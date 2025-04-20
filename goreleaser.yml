@@ -1,23 +1,57 @@
 builds:
-  - binary: minisocks-local
+  - id: minisocks-local
+    binary: minisocks-local
     main: ./cmd/ls-local/main.go
+    env:
+      - CGO_ENABLED=0
     goos:
-       - windows
-       - darwin
-       - linux
-       - freebsd
+      - windows
+      - darwin
+      - linux
+      - freebsd
     goarch:
-       - amd64
-       - 386
-       - arm
-  - binary: minisocks-server
+      - amd64
+      - 386
+      - arm
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+  - id: minisocks-server
+    binary: minisocks-server
     main: ./cmd/ls-server/main.go
+    env:
+      - CGO_ENABLED=0
     goos:
-       - windows
-       - darwin
-       - linux
-       - freebsd
+      - windows
+      - darwin
+      - linux
+      - freebsd
     goarch:
-       - amd64
-       - 386
-       - arm
+      - amd64
+      - 386
+      - arm
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: beijian128
+    name: minisocks
+  prerelease: auto

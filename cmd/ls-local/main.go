@@ -10,7 +10,11 @@ import (
 	"github.com/beijian128/minisocks/local"
 )
 
-var version = "master"
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 func main() {
 	var err error
