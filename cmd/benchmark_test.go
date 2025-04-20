@@ -1,13 +1,14 @@
 package cmd
 
 import (
-	"net"
+	"crypto/rand"
 	"io"
 	"log"
-	"golang.org/x/net/proxy"
-	"math/rand"
-	"testing"
+	"net"
 	"reflect"
+	"testing"
+
+	"golang.org/x/net/proxy"
 )
 
 const (
@@ -30,7 +31,7 @@ func init() {
 	}
 }
 
-//启动echo server
+// 启动echo server
 func runEchoServer() {
 	listener, err := net.Listen("tcp", ECHO_SERVER_ADDR)
 	if err != nil {
@@ -52,13 +53,16 @@ func runEchoServer() {
 	}
 }
 
-//获取 发送 data 到 echo server 并且收到全部返回 所花费到时间
+// 获取 发送 data 到 echo server 并且收到全部返回 所花费到时间
 func BenchmarkAll(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		b.StopTimer()
 		//随机生产 PACK_SIZE byte的[]byte
 		data := make([]byte, PACK_SIZE)
 		_, err := rand.Read(data)
+		if err != nil {
+			log.Fatalln("rand.Read", err)
+		}
 		buf := make([]byte, len(data))
 		b.StartTimer()
 		conn, err := socksDialer.Dial("tcp", ECHO_SERVER_ADDR)
