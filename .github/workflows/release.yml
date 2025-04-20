@@ -1,5 +1,11 @@
 version: 3 # 使用最新配置版本
 
+on:
+  push:
+    tags: 
+      - 'v*'       # v1.0.0 等语义化版本
+      - 'release-*' # release-2025 等自定义标签
+      
 builds:
   - id: minisocks-local
     binary: minisocks-local
