@@ -7,7 +7,7 @@ minisocks - 轻量级 SOCKS5 网络混淆代理工具
 前往 [GitHub Releases](https://github.com/beijian128/minisocks/releases) 下载最新版本，选择适合您操作系统的版本。
 
 2. 服务端配置 (minisocks-server)
-1. 将 `minisocks-server` 上传到您的境外服务器
+1. 将 `minisocks-server` 上传到您的"神秘"服务器
 2. 首次运行：
    ```bash
    ./minisocks-server
