@@ -1,3 +1,6 @@
+# .goreleaser.yml
+version: 2  # 必须添加这行声明配置版本
+
 builds:
   - id: minisocks-local
     binary: minisocks-local
@@ -5,19 +8,14 @@ builds:
     env:
       - CGO_ENABLED=0
     goos:
-      - windows
-      - darwin
       - linux
-      - freebsd
+      - darwin
+      - windows
     goarch:
       - amd64
-      - 386
-      - arm
       - arm64
-    flags:
-      - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+      - -s -w
 
   - id: minisocks-server
     binary: minisocks-server
@@ -25,33 +23,22 @@ builds:
     env:
       - CGO_ENABLED=0
     goos:
-      - windows
-      - darwin
       - linux
-      - freebsd
+      - darwin
+      - windows
     goarch:
       - amd64
-      - 386
-      - arm
       - arm64
-    flags:
-      - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+      - -s -w
 
 archives:
-  - format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - README.md
-      - LICENSE
-      - CHANGELOG.md
-
-checksum:
-  name_template: "checksums.txt"
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip  # Windows 使用 zip
 
 release:
   github:
-    owner: beijian128
+    owner: beijian
     name: minisocks
-  prerelease: auto

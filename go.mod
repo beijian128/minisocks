@@ -1,6 +1,6 @@
 module github.com/beijian128/minisocks
 
-go 1.24.2
+go 1.23
 
 require (
 	github.com/mitchellh/go-homedir v1.1.0
