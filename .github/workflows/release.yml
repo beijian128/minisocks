@@ -1,50 +1,28 @@
-version: 3 # 使用最新配置版本
+# .github/workflows/release.yml
+name: Release
 
 on:
   push:
-    tags: 
-      - 'v*'       # v1.0.0 等语义化版本
-      - 'release-*' # release-2025 等自定义标签
-      
-builds:
-  - id: minisocks-local
-    binary: minisocks-local
-    main: ./cmd/ls-local/main.go
-    env:
-      - CGO_ENABLED=0
-      - GOEXPERIMENT=arenas # Go 1.24 新特性
-    goos: [linux, darwin, windows]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
+    tags:
+      - 'v*'
 
-  - id: minisocks-server
-    binary: minisocks-server
-    main: ./cmd/ls-server/main.go
-    env:
-      - CGO_ENABLED=0
-      - GOEXPERIMENT=arenas
-    goos: [linux, darwin, windows]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-archives:
-  - name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        format: zip
-    replacements:
-      darwin: macos
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.2' # 精确指定版本
+          check-latest: false  # 禁用自动更新，确保版本精确
 
-release:
-  github:
-    owner: beijian128
-    name: minisocks
-  prerelease: auto
+      - name: Install GoReleaser
+        run: go install github.com/goreleaser/goreleaser@v1.24.1
+
+      - name: Run GoReleaser
+        run: goreleaser release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
