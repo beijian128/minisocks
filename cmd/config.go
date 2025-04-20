@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -29,9 +27,9 @@ func init() {
 // 保存配置到配置文件
 func (config *Config) SaveConfig() {
 	configJson, _ := json.MarshalIndent(config, "", "	")
-	err := ioutil.WriteFile(configPath, configJson, 0644)
+	err := os.WriteFile(configPath, configJson, 0644)
 	if err != nil {
-		fmt.Errorf("保存配置到文件 %s 出错: %s", configPath, err)
+		log.Fatalf("保存配置到文件 %s 出错: %v", configPath, err)
 	}
 	log.Printf("保存配置到文件 %s 成功\n", configPath)
 }
@@ -55,7 +53,7 @@ func ReadConfig() *Config {
 		// parse & set Cipher
 		err = json.NewDecoder(file).Decode(config)
 		if err != nil {
-			log.Fatalf("格式不合法的 JSON 配置文件:\n%s", file)
+			log.Fatalf("格式不合法的 JSON 配置文件:\n%s", file.Name())
 		}
 	}
 	config.SaveConfig()
