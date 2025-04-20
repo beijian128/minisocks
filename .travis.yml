@@ -1,0 +1,7 @@
+language: go
+
+go:
+  - 1.9
+
+after_success:
+  - curl -sL https://git.io/goreleaser | bash
