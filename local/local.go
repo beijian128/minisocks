@@ -45,8 +45,12 @@ func (local *LsLocal) Listen() error {
 		return err
 	}
 
-	// 函数结束时关闭监听器，注意此处未处理关闭时可能出现的错误
-	defer listener.Close()
+	// 函数结束时关闭监听器，并处理关闭时可能出现的错误
+	defer func() {
+		if err := listener.Close(); err != nil {
+			log.Printf("关闭监听器时出错: %v", err)
+		}
+	}()
 	// 标记本地代理服务正在运行
 	local.running = true
 
@@ -60,11 +64,14 @@ func (local *LsLocal) Listen() error {
 		// 接受新的 TCP 连接
 		userConn, err := listener.AcceptTCP()
 		if err != nil {
-			// 若接受连接出错，跳过本次循环继续监听
+			// 若接受连接出错，记录错误日志，跳过本次循环继续监听
+			log.Printf("接受新连接时出错: %v", err)
 			continue
 		}
-		// 设置 userConn 关闭时直接清除所有数据，不等待未发送的数据
-		userConn.SetLinger(0)
+		// 设置 userConn 关闭时直接清除所有数据，不等待未发送的数据，并处理可能出现的错误
+		if err := userConn.SetLinger(0); err != nil {
+			log.Printf("设置 userConn Linger 时出错: %v", err)
+		}
 		// 启动一个新的 goroutine 处理该连接
 		go local.handleConn(userConn)
 	}
@@ -84,8 +91,12 @@ func (local *LsLocal) Close() {
 // handleConn 处理与用户浏览器建立的 TCP 连接。
 // 参数 userConn 是与用户浏览器建立的 TCP 连接。
 func (local *LsLocal) handleConn(userConn *net.TCPConn) {
-	// 函数结束时关闭与用户浏览器的连接，注意此处未处理关闭时可能出现的错误
-	defer userConn.Close()
+	// 函数结束时关闭与用户浏览器的连接，并处理关闭时可能出现的错误
+	defer func() {
+		if err := userConn.Close(); err != nil {
+			log.Printf("关闭用户连接时出错: %v", err)
+		}
+	}()
 	// 与远程服务端建立 TCP 连接
 	server, err := local.DialServer()
 	if err != nil {
@@ -93,14 +104,28 @@ func (local *LsLocal) handleConn(userConn *net.TCPConn) {
 		log.Println(err)
 		return
 	}
-	// 函数结束时关闭与远程服务端的连接，注意此处未处理关闭时可能出现的错误
-	defer server.Close()
-	// 设置 server 关闭时直接清除所有数据，不等待未发送的数据
-	server.SetLinger(0)
-	// 设置 server 连接的截止时间
-	server.SetDeadline(time.Now().Add(core.TIMEOUT))
-	// 启动一个新的 goroutine 对数据进行加密并从用户连接转发到服务端连接
-	go local.EncodeCopy(server, userConn)
-	// 对数据进行解密并从服务端连接转发到用户连接
-	local.DecodeCopy(userConn, server)
+	// 函数结束时关闭与远程服务端的连接，并处理关闭时可能出现的错误
+	defer func() {
+		if err := server.Close(); err != nil {
+			log.Printf("关闭服务端连接时出错: %v", err)
+		}
+	}()
+	// 设置 server 关闭时直接清除所有数据，不等待未发送的数据，并处理可能出现的错误
+	if err := server.SetLinger(0); err != nil {
+		log.Printf("设置 server Linger 时出错: %v", err)
+	}
+	// 设置 server 连接的截止时间，并处理可能出现的错误
+	if err := server.SetDeadline(time.Now().Add(core.TIMEOUT)); err != nil {
+		log.Printf("设置 server 截止时间时出错: %v", err)
+	}
+	// 启动一个新的 goroutine 对数据进行加密并从用户连接转发到服务端连接，并处理可能出现的错误
+	go func() {
+		if err := local.EncodeCopy(server, userConn); err != nil {
+			log.Printf("从用户连接转发到服务端连接时出错: %v", err)
+		}
+	}()
+	// 对数据进行解密并从服务端连接转发到用户连接，并处理可能出现的错误
+	if err := local.DecodeCopy(userConn, server); err != nil {
+		log.Printf("从服务端连接转发到用户连接时出错: %v", err)
+	}
 }

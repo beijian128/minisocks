@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/binary" // 提供二进制数据编码解码功能
+	"log"             // 新增日志包，用于记录错误信息
 	"net"             // 提供网络相关功能
 	"time"            // 提供时间相关功能
 
@@ -42,8 +43,12 @@ func (server *LsServer) Listen() error {
 		return err
 	}
 
-	// 函数结束时关闭监听器，注意此处未处理关闭时可能出现的错误
-	defer listener.Close()
+	// 函数结束时关闭监听器，并处理关闭时可能出现的错误
+	defer func() {
+		if err := listener.Close(); err != nil {
+			log.Printf("关闭监听器出错: %v", err)
+		}
+	}()
 	// 标记服务端正在运行
 	server.running = true
 
@@ -57,11 +62,14 @@ func (server *LsServer) Listen() error {
 		// 接受新的 TCP 连接
 		localConn, err := listener.AcceptTCP()
 		if err != nil {
-			// 若接受连接出错，跳过本次循环继续监听
+			// 若接受连接出错，记录错误日志，跳过本次循环继续监听
+			log.Printf("接受新连接出错: %v", err)
 			continue
 		}
-		// 设置 localConn 关闭时直接清除所有数据，不等待未发送的数据
-		localConn.SetLinger(0)
+		// 设置 localConn 关闭时直接清除所有数据，不等待未发送的数据，并处理可能出现的错误
+		if err := localConn.SetLinger(0); err != nil {
+			log.Printf("设置 localConn Linger 出错: %v", err)
+		}
 		// 启动一个新的 goroutine 处理该连接
 		go server.handleConn(localConn)
 	}
@@ -81,11 +89,14 @@ func (server *LsServer) Close() {
 // handleConn 处理来自本地端的连接，实现 socks5 协议
 // 参考文档：
 // https://www.ietf.org/rfc/rfc1928.txt
-// http://www.jianshu.com/p/172810a70fad
 // 参数 localConn 是与本地端建立的 TCP 连接
 func (server *LsServer) handleConn(localConn *net.TCPConn) {
-	// 函数结束时关闭与本地端的连接，注意此处未处理关闭时可能出现的错误
-	defer localConn.Close()
+	// 函数结束时关闭与本地端的连接，并处理关闭时可能出现的错误
+	defer func() {
+		if err := localConn.Close(); err != nil {
+			log.Printf("关闭本地连接出错: %v", err)
+		}
+	}()
 	// 创建缓冲区用于接收数据
 	buf := make([]byte, 256)
 
@@ -118,8 +129,11 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 					| 1  |   1    |
 					+----+--------+
 	*/
-	// 不需要验证，直接发送验证通过消息并加密写入本地连接
-	server.EncodeWrite(localConn, []byte{0x05, 0x00})
+	// 不需要验证，直接发送验证通过消息并加密写入本地连接，并处理可能出现的错误
+	if _, err := server.EncodeWrite(localConn, []byte{0x05, 0x00}); err != nil {
+		log.Printf("发送验证通过消息出错: %v", err)
+		return
+	}
 
 	/**
 	+----+-----+-------+------+----------+----------+
@@ -183,18 +197,34 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 	if err != nil {
 		// 若连接目标服务器失败则返回
 		return
-	} else {
-		// 函数结束时关闭与目标服务器的连接，注意此处未处理关闭时可能出现的错误
-		defer dstServer.Close()
-		// 发送响应消息给客户端表示连接成功并加密写入本地连接
-		server.EncodeWrite(localConn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		// 设置 dstServer 关闭时直接清除所有数据，不等待未发送的数据
-		dstServer.SetLinger(0)
-		// 设置 dstServer 连接的截止时间
-		dstServer.SetDeadline(time.Now().Add(core.TIMEOUT))
 	}
-	// 启动一个新的 goroutine 对数据进行解密并从本地连接转发到目标服务器连接
-	go server.DecodeCopy(dstServer, localConn)
-	// 对数据进行加密并从目标服务器连接转发到本地连接
-	server.EncodeCopy(localConn, dstServer)
+	// 函数结束时关闭与目标服务器的连接，并处理关闭时可能出现的错误
+	defer func() {
+		if err := dstServer.Close(); err != nil {
+			log.Printf("关闭目标服务器连接出错: %v", err)
+		}
+	}()
+	// 发送响应消息给客户端表示连接成功并加密写入本地连接，并处理可能出现的错误
+	if _, err := server.EncodeWrite(localConn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}); err != nil {
+		log.Printf("发送连接成功响应消息出错: %v", err)
+		return
+	}
+	// 设置 dstServer 关闭时直接清除所有数据，不等待未发送的数据，并处理可能出现的错误
+	if err := dstServer.SetLinger(0); err != nil {
+		log.Printf("设置 dstServer Linger 出错: %v", err)
+	}
+	// 设置 dstServer 连接的截止时间，并处理可能出现的错误
+	if err := dstServer.SetDeadline(time.Now().Add(core.TIMEOUT)); err != nil {
+		log.Printf("设置 dstServer 截止时间出错: %v", err)
+	}
+	// 启动一个新的 goroutine 对数据进行解密并从本地连接转发到目标服务器连接，并处理可能出现的错误
+	go func() {
+		if err := server.DecodeCopy(dstServer, localConn); err != nil {
+			log.Printf("从本地连接转发到目标服务器连接出错: %v", err)
+		}
+	}()
+	// 对数据进行加密并从目标服务器连接转发到本地连接，并处理可能出现的错误
+	if err := server.EncodeCopy(localConn, dstServer); err != nil {
+		log.Printf("从目标服务器连接转发到本地连接出错: %v", err)
+	}
 }

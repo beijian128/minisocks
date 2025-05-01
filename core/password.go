@@ -13,7 +13,7 @@ import (
 const PasswordLength = 256
 
 // ErrInvalidPassword 表示密码无效的错误
-var ErrInvalidPassword = errors.New("invlid password")
+var ErrInvalidPassword = errors.New("invalid password")
 
 // Password 类型定义密码结构，是一个长度为 PasswordLength 的字节数组
 type Password [PasswordLength]byte

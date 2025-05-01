@@ -2,13 +2,10 @@
 package cmd
 
 import (
-	"encoding/json" // 提供 JSON 编码和解码功能
-	"log"           // 提供简单的日志记录功能
-	"os"            // 提供与操作系统交互的功能
-	"path"          // 提供对路径进行操作的功能
-
+	"encoding/json"                        // 提供 JSON 编码和解码功能
 	"github.com/beijian128/minisocks/core" // 引入 minisocks 核心功能包
-	"github.com/mitchellh/go-homedir"      // 提供获取用户主目录的功能
+	"log"                                  // 提供简单的日志记录功能
+	"os"                                   // 提供与操作系统交互的功能
 )
 
 // Config 结构体定义了 minisocks 的配置信息
@@ -22,15 +19,7 @@ type Config struct {
 }
 
 // 配置文件路径，用于存储 minisocks 的配置信息
-var configPath string
-
-// init 函数在包被加载时自动执行，用于初始化配置文件路径
-func init() {
-	// 获取用户主目录，忽略可能的错误
-	home, _ := homedir.Dir()
-	// 拼接配置文件的完整路径
-	configPath = path.Join(home, ".minisocks.json")
-}
+var configPath = "./minisocks.json"
 
 // SaveConfig 将配置信息保存到配置文件中
 func (config *Config) SaveConfig() {
