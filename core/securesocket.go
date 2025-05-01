@@ -5,6 +5,7 @@ import (
 	"errors" // 提供错误处理功能
 	"fmt"    // 提供格式化输入输出功能
 	"io"     // 提供基础的 I/O 接口
+	"log"    // 新增日志包
 	"net"    // 提供网络相关功能
 	"time"   // 提供时间相关功能
 )
@@ -27,13 +28,17 @@ type SecureSocket struct {
 // 参数 bs 是用于存储解密后数据的字节切片。
 // 返回读取的字节数和可能出现的错误。
 func (secureSocket *SecureSocket) DecodeRead(conn *net.TCPConn, bs []byte) (n int, err error) {
+	log.Printf("DEBUG: 开始从 %s 读取加密数据", conn.RemoteAddr())
 	// 从连接中读取数据
 	n, err = conn.Read(bs)
 	if err != nil {
+		log.Printf("DEBUG: 从 %s 读取数据时出错: %v", conn.RemoteAddr(), err)
 		return
 	}
+	log.Printf("DEBUG: 从 %s 读取到 %d 字节加密数据", conn.RemoteAddr(), n)
 	// 对读取到的数据进行解密
 	secureSocket.Cipher.decode(bs[:n])
+	log.Printf("DEBUG: 已对从 %s 读取的 %d 字节数据完成解密", conn.RemoteAddr(), n)
 	return
 }
 
@@ -42,10 +47,19 @@ func (secureSocket *SecureSocket) DecodeRead(conn *net.TCPConn, bs []byte) (n in
 // 参数 bs 是要加密并写入的数据。
 // 返回写入的字节数和可能出现的错误。
 func (secureSocket *SecureSocket) EncodeWrite(conn *net.TCPConn, bs []byte) (int, error) {
+	log.Printf("DEBUG: 开始对 %d 字节数据进行加密", len(bs))
 	// 对数据进行加密
 	secureSocket.Cipher.encode(bs)
+	log.Printf("DEBUG: 已完成 %d 字节数据的加密", len(bs))
 	// 将加密后的数据写入连接
-	return conn.Write(bs)
+	log.Printf("DEBUG: 开始向 %s 写入加密数据", conn.RemoteAddr())
+	n, err := conn.Write(bs)
+	if err != nil {
+		log.Printf("DEBUG: 向 %s 写入数据时出错: %v", conn.RemoteAddr(), err)
+	} else {
+		log.Printf("DEBUG: 已向 %s 写入 %d 字节加密数据", conn.RemoteAddr(), n)
+	}
+	return n, err
 }
 
 // EncodeCopy 从源 TCP 连接中持续读取原始数据，加密后写入目标 TCP 连接，直到源连接没有更多数据可读。
@@ -53,26 +67,33 @@ func (secureSocket *SecureSocket) EncodeWrite(conn *net.TCPConn, bs []byte) (int
 // 参数 src 是源 TCP 连接。
 // 返回可能出现的错误。
 func (secureSocket *SecureSocket) EncodeCopy(dst *net.TCPConn, src *net.TCPConn) error {
+	log.Printf("DEBUG: 开始从 %s 读取原始数据并加密写入 %s", src.RemoteAddr(), dst.RemoteAddr())
 	// 创建缓冲区
 	buf := make([]byte, BufSize)
 	for {
 		// 从源连接读取数据
 		nr, er := src.Read(buf)
 		if nr > 0 {
+			log.Printf("DEBUG: 从 %s 读取到 %d 字节原始数据", src.RemoteAddr(), nr)
 			// 对读取的数据进行加密并写入目标连接
 			nw, ew := secureSocket.EncodeWrite(dst, buf[0:nr])
 			if ew != nil {
+				log.Printf("DEBUG: 向 %s 写入加密数据时出错: %v", dst.RemoteAddr(), ew)
 				return ew
 			}
 			// 检查写入的字节数是否与读取的字节数一致
 			if nr != nw {
+				log.Printf("DEBUG: 向 %s 写入加密数据时字节数不匹配，读取 %d 字节，写入 %d 字节", dst.RemoteAddr(), nr, nw)
 				return io.ErrShortWrite
 			}
+			log.Printf("DEBUG: 已成功将 %d 字节原始数据加密写入 %s", nr, dst.RemoteAddr())
 		}
 		if er != nil {
 			if er != io.EOF {
+				log.Printf("DEBUG: 从 %s 读取数据时出错: %v", src.RemoteAddr(), er)
 				return er
 			} else {
+				log.Printf("DEBUG: 从 %s 读取数据结束（EOF）", src.RemoteAddr())
 				return nil
 			}
 		}
@@ -84,26 +105,33 @@ func (secureSocket *SecureSocket) EncodeCopy(dst *net.TCPConn, src *net.TCPConn)
 // 参数 src 是源 TCP 连接。
 // 返回可能出现的错误。
 func (secureSocket *SecureSocket) DecodeCopy(dst *net.TCPConn, src *net.TCPConn) error {
+	log.Printf("DEBUG: 开始从 %s 读取加密数据并解密写入 %s", src.RemoteAddr(), dst.RemoteAddr())
 	// 创建缓冲区
 	buf := make([]byte, BufSize)
 	for {
 		// 从源连接读取加密数据并解密
 		nr, er := secureSocket.DecodeRead(src, buf)
 		if nr > 0 {
+			log.Printf("DEBUG: 从 %s 读取并解密 %d 字节数据", src.RemoteAddr(), nr)
 			// 将解密后的数据写入目标连接
 			nw, ew := dst.Write(buf[0:nr])
 			if ew != nil {
+				log.Printf("DEBUG: 向 %s 写入解密数据时出错: %v", dst.RemoteAddr(), ew)
 				return ew
 			}
 			// 检查写入的字节数是否与读取的字节数一致
 			if nr != nw {
+				log.Printf("DEBUG: 向 %s 写入解密数据时字节数不匹配，读取 %d 字节，写入 %d 字节", dst.RemoteAddr(), nr, nw)
 				return io.ErrShortWrite
 			}
+			log.Printf("DEBUG: 已成功将 %d 字节解密数据写入 %s", nr, dst.RemoteAddr())
 		}
 		if er != nil {
 			if er != io.EOF {
+				log.Printf("DEBUG: 从 %s 读取加密数据时出错: %v", src.RemoteAddr(), er)
 				return er
 			} else {
+				log.Printf("DEBUG: 从 %s 读取加密数据结束（EOF）", src.RemoteAddr())
 				return nil
 			}
 		}
@@ -113,11 +141,15 @@ func (secureSocket *SecureSocket) DecodeCopy(dst *net.TCPConn, src *net.TCPConn)
 // DialServer 与远程服务器建立 TCP 连接，该连接上的数据将进行加密传输。
 // 返回建立好的 TCP 连接和可能出现的错误。
 func (secureSocket *SecureSocket) DialServer() (*net.TCPConn, error) {
+	log.Printf("DEBUG: 尝试连接远程服务器 %s", secureSocket.ServerAddr)
 	// 尝试与远程服务器建立 TCP 连接
 	remoteConn, err := net.DialTCP("tcp", nil, secureSocket.ServerAddr)
 	if err != nil {
 		// 若连接失败，返回错误信息
-		return nil, errors.New(fmt.Sprintf("dail remote %s fail:%s", secureSocket.ServerAddr, err))
+		errMsg := fmt.Sprintf("dail remote %s fail:%s", secureSocket.ServerAddr, err)
+		log.Printf("DEBUG: 连接远程服务器 %s 失败: %v", secureSocket.ServerAddr, err)
+		return nil, errors.New(errMsg)
 	}
+	log.Printf("DEBUG: 成功连接到远程服务器 %s", secureSocket.ServerAddr)
 	return remoteConn, nil
 }
