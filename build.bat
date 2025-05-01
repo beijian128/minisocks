@@ -1,2 +1,2 @@
 @REM set GOOS=linux
-go build -o minisocks ./cmd/ls-server/main.go
+go build -o minisocks.exe ./cmd/ls-server/main.go
