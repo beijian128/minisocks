@@ -159,7 +159,7 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 	// CMD 代表客户端请求的类型，值长度为 1 个字节，有三种类型
 	// CONNECT X'01'
 	// 目前只支持 CONNECT 类型，若不是则返回
-	if buf[1] != 0x01 {
+	if data[1] != 0x01 {
 		log.Printf("ERROR: 不支持的请求类型: 0x%x，仅支持 CONNECT(0x01)", buf[1])
 		return
 	}
