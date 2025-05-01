@@ -185,32 +185,32 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 
 	var dIP []byte
 	// aType 代表请求的远程服务器地址类型，值长度 1 个字节，有三种类型
-	switch buf[3] {
+	switch data[3] {
 	case 0x01:
 		//	IP V4 address: X'01'
-		dIP = buf[4 : 4+net.IPv4len]
+		dIP = data[4 : 4+net.IPv4len]
 		log.Println("DEBUG: 目标地址类型为 IPv4")
 	case 0x03:
 		//	DOMAINNAME: X'03'
 		// 解析域名对应的 IP 地址
 		log.Println("DEBUG: 目标地址类型为域名，开始解析域名")
-		ipAddr, err := net.ResolveIPAddr("ip", string(buf[5:n-2]))
+		ipAddr, err := net.ResolveIPAddr("ip", string(data[5:n-2]))
 		if err != nil {
-			log.Printf("ERROR: 解析域名 %s 出错: %v", string(buf[5:n-2]), err)
+			log.Printf("ERROR: 解析域名 %s 出错: %v", string(data[5:n-2]), err)
 			return
 		}
 		dIP = ipAddr.IP
 		log.Printf("DEBUG: 域名解析成功，IP 地址为 %s", dIP)
 	case 0x04:
 		//	IP V6 address: X'04'
-		dIP = buf[4 : 4+net.IPv6len]
+		dIP = data[4 : 4+net.IPv6len]
 		log.Println("DEBUG: 目标地址类型为 IPv6")
 	default:
-		log.Printf("ERROR: 不支持的目标地址类型: 0x%x", buf[3])
+		log.Printf("ERROR: 不支持的目标地址类型: 0x%x", data[3])
 		return
 	}
 	// 提取目标端口信息
-	dPort := buf[n-2:]
+	dPort := data[n-2:]
 	// 构建目标服务器的 TCP 地址
 	dstAddr := &net.TCPAddr{
 		IP:   dIP,
