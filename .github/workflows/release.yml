@@ -1,31 +1,49 @@
+# 定义 GitHub Actions 工作流的名称，该工作流用于发布新版本
 name: Release
 
+# 定义触发工作流的事件
 on:
+  # 当有新的标签（tag）推送到仓库时触发，标签格式需为 v 开头
   push:
     tags:
       - 'v*'
 
+# 定义工作流中的任务
 jobs:
+  # 定义名为 release 的任务
   release:
+    # 指定任务运行的环境，使用最新的 Ubuntu 系统
     runs-on: ubuntu-latest
+    # 定义任务所需的权限
     permissions:
+      # 赋予写入仓库内容的权限，用于创建 Release 和上传文件
       contents: write  # 核心权限：允许创建 Release 和上传文件[1](@ref)
+      # 赋予读取 Actions 的权限，允许执行基础操作
       actions: read    # 默认权限，允许基础操作[7](@ref)
 
+    # 定义任务的执行步骤
     steps:
+      # 使用 GitHub 官方的 checkout 动作，将仓库代码拉取到运行环境
       - uses: actions/checkout@v4
         with:
+          # 设置拉取代码时获取完整的提交历史
           fetch-depth: 0  # 必须获取完整提交历史[7](@ref)
 
+      # 使用 GitHub 官方的 setup-go 动作，配置 Go 开发环境
       - uses: actions/setup-go@v4
         with:
+          # 指定安装的 Go 版本为 1.24.2
           go-version: '1.24.2' 
+          # 不检查是否有最新的 Go 版本
           check-latest: false
 
+      # 安装 GoReleaser 工具，用于自动化构建和发布 Go 项目
       - name: Install GoReleaser
         run: go install github.com/goreleaser/goreleaser@latest
 
+      # 运行 GoReleaser 进行版本发布，并清理临时文件
       - name: Run GoReleaser
         run: goreleaser release --clean
         env:
+          # 注入 GitHub Token，用于认证和授权操作
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 确保 Token 注入[6](@ref)

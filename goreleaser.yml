@@ -1,44 +1,66 @@
 # .goreleaser.yml
+# 定义 GoReleaser 配置文件的版本，当前使用版本 1
 version: 1
 
+# builds 部分定义了构建任务列表，可以配置多个不同的构建任务
 builds:
+  # 第一个构建任务，用于构建 minisocks 本地客户端
   - id: minisocks-local
+    # 构建生成的二进制文件名称
     binary: minisocks-local
+    # 构建的主程序入口文件路径
     main: ./cmd/ls-local/main.go
+    # 构建时的环境变量，CGO_ENABLED=0 表示禁用 CGO 支持
     env:
       - CGO_ENABLED=0
+    # 支持构建的目标操作系统列表
     goos:
       - linux
       - darwin
       - windows
+    # 支持构建的目标 CPU 架构列表
     goarch:
       - amd64
       - arm64
+    # 传递给 Go 编译器的链接器标志，-s -w 用于剥离符号表和调试信息，减小二进制文件大小
     ldflags:
       - -s -w
 
+  # 第二个构建任务，用于构建 minisocks 服务端
   - id: minisocks-server
+    # 构建生成的二进制文件名称
     binary: minisocks-server
+    # 构建的主程序入口文件路径
     main: ./cmd/ls-server/main.go
+    # 构建时的环境变量，CGO_ENABLED=0 表示禁用 CGO 支持
     env:
       - CGO_ENABLED=0
+    # 支持构建的目标操作系统列表
     goos:
       - linux
       - darwin
       - windows
+    # 支持构建的目标 CPU 架构列表
     goarch:
       - amd64
       - arm64
+    # 传递给 Go 编译器的链接器标志，-s -w 用于剥离符号表和调试信息，减小二进制文件大小
     ldflags:
       - -s -w
 
+# archives 部分定义了构建产物的归档配置
 archives:
+  # 归档配置项
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # 定义不同操作系统下的归档格式覆盖规则
     format_overrides:
       - goos: windows
-        format: zip  # Windows 使用 zip
+        format: zip  # Windows 系统使用 zip 格式进行归档
 
+# release 部分定义了发布到 GitHub 的配置
 release:
   github:
+    # GitHub 仓库的所有者
     owner: beijian128
+    # GitHub 仓库的名称
     name: minisocks
