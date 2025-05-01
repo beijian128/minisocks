@@ -2,10 +2,9 @@
 package cmd
 
 import (
-	"encoding/json"                        // 提供 JSON 编码和解码功能
-	"github.com/beijian128/minisocks/core" // 引入 minisocks 核心功能包
-	"log"                                  // 提供简单的日志记录功能
-	"os"                                   // 提供与操作系统交互的功能
+	"encoding/json" // 提供 JSON 编码和解码功能
+	"log"           // 提供简单的日志记录功能
+	"os"            // 提供与操作系统交互的功能
 )
 
 // Config 结构体定义了 minisocks 的配置信息
@@ -41,7 +40,6 @@ func ReadConfig() *Config {
 	config := &Config{
 		ListenAddr: ":7448",
 		RemoteAddr: ":7448",
-		Password:   core.RandPassword().String(),
 	}
 
 	// 检查配置文件是否存在

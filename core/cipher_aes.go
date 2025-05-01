@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"io"
 )
@@ -18,6 +19,9 @@ type AES struct {
 // NewAES 创建一个新的 AES 加密器实例
 // key 必须是 16(AES-128), 24(AES-192) 或 32(AES-256) 字节长度
 func NewAES(key []byte) (*AES, error) {
+	if len(key) == 0 {
+		key, _ = hex.DecodeString(AESDefaultKey)
+	}
 	switch len(key) {
 	case 16, 24, 32:
 		return &AES{key: key}, nil

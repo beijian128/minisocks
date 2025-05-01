@@ -7,7 +7,6 @@ import (
 	"net" // 提供网络相关的功能
 
 	"github.com/beijian128/minisocks/cmd"
-	"github.com/beijian128/minisocks/core"
 	"github.com/beijian128/minisocks/local"
 )
 
@@ -26,12 +25,7 @@ func main() {
 	var err error
 	// 从配置文件中读取配置信息
 	config := cmd.ReadConfig()
-	// 解析配置文件中的密码
-	password, err := core.ParsePassword(config.Password)
-	// 若密码解析失败，记录错误日志并终止程序
-	if err != nil {
-		log.Fatalln(err)
-	}
+
 	// 将本地监听地址解析为 TCP 地址
 	localAddr, err := net.ResolveTCPAddr("tcp", config.ListenAddr)
 	// 若解析失败，记录错误日志并终止程序
@@ -45,7 +39,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	// 创建一个本地代理实例
-	lsLocal := local.New(password, localAddr, serverAddr)
+	lsLocal := local.New(localAddr, serverAddr)
 	// 设置本地代理监听成功后的回调函数
 	lsLocal.AfterListen = func(listenAddr net.Addr) {
 		// 记录程序启动成功的日志，包含版本号和监听地址

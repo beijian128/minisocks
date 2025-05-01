@@ -26,11 +26,12 @@ type LsLocal struct {
 // 参数 localAddr 是本地监听地址。
 // 参数 serverAddr 是远程服务端地址。
 // 返回一个指向 LsLocal 实例的指针。
-func New(encodePassword *core.Password, localAddr, serverAddr *net.TCPAddr) *LsLocal {
+func New(localAddr, serverAddr *net.TCPAddr) *LsLocal {
 	log.Printf("DEBUG: 创建新的本地代理实例，本地地址: %s, 服务端地址: %s", localAddr.String(), serverAddr.String())
+	ci, _ := core.NewAES(nil)
 	return &LsLocal{
 		SecureSocket: &core.SecureSocket{
-			Cipher:     core.NewSimpleCipher(encodePassword), // 创建编解码器实例
+			Cipher:     ci,
 			LocalAddr:  localAddr,
 			ServerAddr: serverAddr,
 		},

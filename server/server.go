@@ -25,11 +25,12 @@ type LsServer struct {
 // 参数 encodePassword 是用于加密的密码
 // 参数 localAddr 是服务端监听的本地地址
 // 返回一个指向 LsServer 实例的指针
-func New(encodePassword *core.Password, localAddr *net.TCPAddr) *LsServer {
+func New(localAddr *net.TCPAddr) *LsServer {
 	log.Printf("DEBUG: 创建新的服务端实例，监听地址: %s", localAddr.String())
+	ci, _ := core.NewAES(nil)
 	return &LsServer{
 		SecureSocket: &core.SecureSocket{
-			Cipher:    core.NewCipher(encodePassword), // 创建编解码器实例
+			Cipher:    ci, // 创建编解码器实例
 			LocalAddr: localAddr,
 		},
 	}
@@ -114,9 +115,10 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 	*/
 	// 读取本地端发送的版本和方法选择消息并解密
 	log.Println("DEBUG: 读取本地端发送的版本和方法选择消息")
-	_, err := server.DecodeRead(localConn, buf)
+	n, err := localConn.Read(buf)
+	data, err := server.Cipher.Decrypt(buf[:n])
 	// 只支持 Socks5 协议，若读取出错或版本号不为 0x05 则返回
-	if err != nil || buf[0] != 0x05 {
+	if err != nil || data[0] != 0x05 {
 		if err != nil {
 			log.Printf("ERROR: 读取版本和方法选择消息出错: %v", err)
 		} else {
@@ -138,7 +140,8 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 	*/
 	// 不需要验证，直接发送验证通过消息并加密写入本地连接
 	log.Println("DEBUG: 发送验证通过消息")
-	err = server.EncodeWrite(localConn, []byte{0x05, 0x00})
+	data, _ = server.Cipher.Encrypt([]byte{0x05, 0x00})
+	_, err = localConn.Write(data)
 	if err != nil {
 		log.Printf("ERROR: 发送验证通过消息出错: %v", err)
 		return
@@ -164,10 +167,13 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 
 	// 读取客户端请求的目标地址和端口信息并解密
 	log.Println("DEBUG: 读取客户端请求的目标地址和端口信息")
-	n, err := server.DecodeRead(localConn, buf)
+	//n, err := server.DecodeRead(localConn, buf)
+	n, err = localConn.Read(buf)
+	data, err = server.Cipher.Decrypt(buf[:n])
+	n = len(data)
 	// n 最短的长度为 7，情况为 ATYP=3 且 DST.ADDR 占用 1 字节，值为 0x0
 	// 若读取出错或长度不足则返回
-	if err != nil || n < 7 {
+	if err != nil || len(data) < 7 {
 		if err != nil {
 			log.Printf("ERROR: 读取目标地址和端口信息出错: %v", err)
 		} else {
@@ -232,7 +238,8 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 		defer dstServer.Close()
 		// 发送响应消息给客户端表示连接成功并加密写入本地连接
 		log.Println("DEBUG: 发送连接成功响应消息")
-		_, err = server.EncodeWrite(localConn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		data, _ = server.Cipher.Encrypt([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		_, err = localConn.Write(data)
 		if err != nil {
 			log.Printf("ERROR: 发送连接成功响应消息出错: %v", err)
 			return
