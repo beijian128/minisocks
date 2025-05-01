@@ -14,52 +14,13 @@ import (
 const BufSize = 1024
 
 // TIMEOUT 定义网络操作的超时时间
-const TIMEOUT = 10 * time.Second
+const TIMEOUT = time.Minute
 
 // SecureSocket 结构体表示一个安全的网络套接字，用于加密传输数据
 type SecureSocket struct {
-	Cipher     *Cipher      // 编解码器实例，用于数据的加密和解密
+	Cipher     Cipher       // 编解码器实例，用于数据的加密和解密
 	LocalAddr  *net.TCPAddr // 本地 TCP 地址
 	ServerAddr *net.TCPAddr // 远程服务器 TCP 地址
-}
-
-// DecodeRead 从指定的 TCP 连接中读取加密数据，解密后将原始数据存入指定的字节切片中。
-// 参数 conn 是要读取数据的 TCP 连接。
-// 参数 bs 是用于存储解密后数据的字节切片。
-// 返回读取的字节数和可能出现的错误。
-func (secureSocket *SecureSocket) DecodeRead(conn *net.TCPConn, bs []byte) (n int, err error) {
-	log.Printf("DEBUG: 开始从 %s 读取加密数据", conn.RemoteAddr())
-	// 从连接中读取数据
-	n, err = conn.Read(bs)
-	if err != nil {
-		log.Printf("DEBUG: 从 %s 读取数据时出错: %v", conn.RemoteAddr(), err)
-		return
-	}
-	log.Printf("DEBUG: 从 %s 读取到 %d 字节加密数据", conn.RemoteAddr(), n)
-	// 对读取到的数据进行解密
-	secureSocket.Cipher.decode(bs[:n])
-	log.Printf("DEBUG: 已对从 %s 读取的 %d 字节数据完成解密", conn.RemoteAddr(), n)
-	return
-}
-
-// EncodeWrite 对指定字节切片中的数据进行加密，并将加密后的数据全部写入指定的 TCP 连接。
-// 参数 conn 是要写入数据的 TCP 连接。
-// 参数 bs 是要加密并写入的数据。
-// 返回写入的字节数和可能出现的错误。
-func (secureSocket *SecureSocket) EncodeWrite(conn *net.TCPConn, bs []byte) (int, error) {
-	log.Printf("DEBUG: 开始对 %d 字节数据进行加密", len(bs))
-	// 对数据进行加密
-	secureSocket.Cipher.encode(bs)
-	log.Printf("DEBUG: 已完成 %d 字节数据的加密", len(bs))
-	// 将加密后的数据写入连接
-	log.Printf("DEBUG: 开始向 %s 写入加密数据", conn.RemoteAddr())
-	n, err := conn.Write(bs)
-	if err != nil {
-		log.Printf("DEBUG: 向 %s 写入数据时出错: %v", conn.RemoteAddr(), err)
-	} else {
-		log.Printf("DEBUG: 已向 %s 写入 %d 字节加密数据", conn.RemoteAddr(), n)
-	}
-	return n, err
 }
 
 // EncodeCopy 从源 TCP 连接中持续读取原始数据，加密后写入目标 TCP 连接，直到源连接没有更多数据可读。
@@ -76,16 +37,17 @@ func (secureSocket *SecureSocket) EncodeCopy(dst *net.TCPConn, src *net.TCPConn)
 		if nr > 0 {
 			log.Printf("DEBUG: 从 %s 读取到 %d 字节原始数据", src.RemoteAddr(), nr)
 			// 对读取的数据进行加密并写入目标连接
-			nw, ew := secureSocket.EncodeWrite(dst, buf[0:nr])
+			data, err := secureSocket.Cipher.Encrypt(buf[:nr])
+			if err != nil {
+				log.Printf("ERROR: <UNK>: %v", err)
+				return err
+			}
+			_, ew := dst.Write(data)
 			if ew != nil {
 				log.Printf("DEBUG: 向 %s 写入加密数据时出错: %v", dst.RemoteAddr(), ew)
 				return ew
 			}
-			// 检查写入的字节数是否与读取的字节数一致
-			if nr != nw {
-				log.Printf("DEBUG: 向 %s 写入加密数据时字节数不匹配，读取 %d 字节，写入 %d 字节", dst.RemoteAddr(), nr, nw)
-				return io.ErrShortWrite
-			}
+
 			log.Printf("DEBUG: 已成功将 %d 字节原始数据加密写入 %s", nr, dst.RemoteAddr())
 		}
 		if er != nil {
@@ -110,19 +72,20 @@ func (secureSocket *SecureSocket) DecodeCopy(dst *net.TCPConn, src *net.TCPConn)
 	buf := make([]byte, BufSize)
 	for {
 		// 从源连接读取加密数据并解密
-		nr, er := secureSocket.DecodeRead(src, buf)
+
+		nr, er := src.Read(buf)
 		if nr > 0 {
 			log.Printf("DEBUG: 从 %s 读取并解密 %d 字节数据", src.RemoteAddr(), nr)
+			data, err := secureSocket.Cipher.Decrypt(buf[0:nr])
+			if err != nil {
+				log.Printf("DEBUG: <UNK> %s <UNK>: %v", dst.RemoteAddr(), err)
+				return err
+			}
 			// 将解密后的数据写入目标连接
-			nw, ew := dst.Write(buf[0:nr])
+			_, ew := dst.Write(data)
 			if ew != nil {
 				log.Printf("DEBUG: 向 %s 写入解密数据时出错: %v", dst.RemoteAddr(), ew)
 				return ew
-			}
-			// 检查写入的字节数是否与读取的字节数一致
-			if nr != nw {
-				log.Printf("DEBUG: 向 %s 写入解密数据时字节数不匹配，读取 %d 字节，写入 %d 字节", dst.RemoteAddr(), nr, nw)
-				return io.ErrShortWrite
 			}
 			log.Printf("DEBUG: 已成功将 %d 字节解密数据写入 %s", nr, dst.RemoteAddr())
 		}

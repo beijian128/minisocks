@@ -112,55 +112,55 @@ func (server *LsServer) handleConn(localConn *net.TCPConn) {
 	NMETHODS field contains the number of method identifier octets that
 	appear in the METHODS field.
 	*/
-	//// 读取本地端发送的版本和方法选择消息并解密
-	//log.Println("DEBUG: 读取本地端发送的版本和方法选择消息")
-	//_, err := server.DecodeRead(localConn, buf)
-	//// 只支持 Socks5 协议，若读取出错或版本号不为 0x05 则返回
-	//if err != nil || buf[0] != 0x05 {
-	//	if err != nil {
-	//		log.Printf("ERROR: 读取版本和方法选择消息出错: %v", err)
-	//	} else {
-	//		log.Println("ERROR: 不支持的协议版本，仅支持 Socks5")
-	//	}
-	//	return
-	//}
-	//log.Println("DEBUG: 成功读取版本和方法选择消息，协议版本为 Socks5")
-	//
-	///**
-	//The dstServer selects from one of the methods given in METHODS, and
-	//sends a METHOD selection message:
-	//
-	//				+----+--------+
-	//				|VER | METHOD |
-	//				+----+--------+
-	//				| 1  |   1    |
-	//				+----+--------+
-	//*/
-	//// 不需要验证，直接发送验证通过消息并加密写入本地连接
-	//log.Println("DEBUG: 发送验证通过消息")
-	//_, err = server.EncodeWrite(localConn, []byte{0x05, 0x00})
-	//if err != nil {
-	//	log.Printf("ERROR: 发送验证通过消息出错: %v", err)
-	//	return
-	//}
-	//log.Println("DEBUG: 验证通过消息发送成功")
-	//
-	///**
-	//+----+-----+-------+------+----------+----------+
-	//|VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
-	//+----+-----+-------+------+----------+----------+
-	//| 1  |  1  | X'00' |  1   | Variable |    2     |
-	//+----+-----+-------+------+----------+----------+
-	//*/
-	//
-	//// CMD 代表客户端请求的类型，值长度为 1 个字节，有三种类型
-	//// CONNECT X'01'
-	//// 目前只支持 CONNECT 类型，若不是则返回
-	//if buf[1] != 0x01 {
-	//	log.Printf("ERROR: 不支持的请求类型: 0x%x，仅支持 CONNECT(0x01)", buf[1])
-	//	return
-	//}
-	//log.Println("DEBUG: 客户端请求类型为 CONNECT")
+	// 读取本地端发送的版本和方法选择消息并解密
+	log.Println("DEBUG: 读取本地端发送的版本和方法选择消息")
+	_, err := server.DecodeRead(localConn, buf)
+	// 只支持 Socks5 协议，若读取出错或版本号不为 0x05 则返回
+	if err != nil || buf[0] != 0x05 {
+		if err != nil {
+			log.Printf("ERROR: 读取版本和方法选择消息出错: %v", err)
+		} else {
+			log.Println("ERROR: 不支持的协议版本，仅支持 Socks5")
+		}
+		return
+	}
+	log.Println("DEBUG: 成功读取版本和方法选择消息，协议版本为 Socks5")
+
+	/**
+	The dstServer selects from one of the methods given in METHODS, and
+	sends a METHOD selection message:
+
+					+----+--------+
+					|VER | METHOD |
+					+----+--------+
+					| 1  |   1    |
+					+----+--------+
+	*/
+	// 不需要验证，直接发送验证通过消息并加密写入本地连接
+	log.Println("DEBUG: 发送验证通过消息")
+	err = server.EncodeWrite(localConn, []byte{0x05, 0x00})
+	if err != nil {
+		log.Printf("ERROR: 发送验证通过消息出错: %v", err)
+		return
+	}
+	log.Println("DEBUG: 验证通过消息发送成功")
+
+	/**
+	+----+-----+-------+------+----------+----------+
+	|VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+	+----+-----+-------+------+----------+----------+
+	| 1  |  1  | X'00' |  1   | Variable |    2     |
+	+----+-----+-------+------+----------+----------+
+	*/
+
+	// CMD 代表客户端请求的类型，值长度为 1 个字节，有三种类型
+	// CONNECT X'01'
+	// 目前只支持 CONNECT 类型，若不是则返回
+	if buf[1] != 0x01 {
+		log.Printf("ERROR: 不支持的请求类型: 0x%x，仅支持 CONNECT(0x01)", buf[1])
+		return
+	}
+	log.Println("DEBUG: 客户端请求类型为 CONNECT")
 
 	// 读取客户端请求的目标地址和端口信息并解密
 	log.Println("DEBUG: 读取客户端请求的目标地址和端口信息")

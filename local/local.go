@@ -30,7 +30,7 @@ func New(encodePassword *core.Password, localAddr, serverAddr *net.TCPAddr) *LsL
 	log.Printf("DEBUG: 创建新的本地代理实例，本地地址: %s, 服务端地址: %s", localAddr.String(), serverAddr.String())
 	return &LsLocal{
 		SecureSocket: &core.SecureSocket{
-			Cipher:     core.NewCipher(encodePassword), // 创建编解码器实例
+			Cipher:     core.NewSimpleCipher(encodePassword), // 创建编解码器实例
 			LocalAddr:  localAddr,
 			ServerAddr: serverAddr,
 		},
@@ -94,26 +94,38 @@ func (local *LsLocal) Close() {
 // 参数 userConn 是与用户浏览器建立的 TCP 连接。
 func (local *LsLocal) handleConn(userConn *net.TCPConn) {
 	log.Printf("DEBUG: 开始处理来自 %s 的连接", userConn.RemoteAddr().String())
-	// 函数结束时关闭与用户浏览器的连接，注意此处未处理关闭时可能出现的错误
-	defer userConn.Close()
+	// 函数结束时关闭与用户浏览器的连接，处理关闭时可能出现的错误
+	defer func() {
+		if err := userConn.Close(); err != nil {
+			log.Printf("ERROR: 关闭用户浏览器连接出错: %v", err)
+		}
+	}()
+
 	// 与远程服务端建立 TCP 连接
 	server, err := local.DialServer()
 	if err != nil {
 		// 若连接失败，记录错误日志并返回
-		log.Printf("DEBUG: 连接远程服务端 %s 失败: %v", local.ServerAddr.String(), err)
+		log.Printf("ERROR: 连接远程服务端出错: %v", err)
 		return
 	}
-	log.Printf("DEBUG: 成功连接到远程服务端 %s", local.ServerAddr.String())
-	// 函数结束时关闭与远程服务端的连接，注意此处未处理关闭时可能出现的错误
-	defer server.Close()
+
+	// 函数结束时关闭与远程服务端的连接，处理关闭时可能出现的错误
+	defer func() {
+		if err := server.Close(); err != nil {
+			log.Printf("ERROR: 关闭远程服务端连接出错: %v", err)
+		}
+	}()
+
 	// 设置 server 关闭时直接清除所有数据，不等待未发送的数据
 	server.SetLinger(0)
 	// 设置 server 连接的截止时间
 	server.SetDeadline(time.Now().Add(core.TIMEOUT))
+
 	// 启动一个新的 goroutine 对数据进行加密并从用户连接转发到服务端连接
 	go local.EncodeCopy(server, userConn)
-	log.Printf("DEBUG: 启动加密转发协程，从 %s 到 %s", userConn.RemoteAddr().String(), local.ServerAddr.String())
 	// 对数据进行解密并从服务端连接转发到用户连接
 	local.DecodeCopy(userConn, server)
 	log.Printf("DEBUG: 完成从 %s 到 %s 的解密转发", local.ServerAddr.String(), userConn.RemoteAddr().String())
 }
+
+// ... 已有代码 ...
