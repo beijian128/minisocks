@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/hex"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -28,14 +29,14 @@ func TestAES_Encrypt(t *testing.T) {
 }
 
 func TestAES_Encrypt2(t *testing.T) {
-	var data []byte
+	var datas [][]byte
 	{
 		aes, err := NewAES(nil)
 		assert.NoError(t, err)
 		for i := 0; i < 100; i++ {
-			got, err := aes.Encrypt([]byte("hello world"))
+			got, err := aes.Encrypt([]byte(fmt.Sprintf("hello world %d", i)))
 			assert.NoError(t, err)
-			data = got
+			datas = append(datas, got)
 		}
 
 	}
@@ -44,10 +45,10 @@ func TestAES_Encrypt2(t *testing.T) {
 
 		aes, err := NewAES(nil)
 		assert.NoError(t, err)
-		for i := 0; i < 10; i++ {
-			got, err := aes.Decrypt(data)
+		for i := 99; i >= 0; i-- {
+			got, err := aes.Decrypt(datas[i])
 			assert.NoError(t, err)
-			assert.Equal(t, "hello world", string(got))
+			assert.Equal(t, fmt.Sprintf("hello world %d", i), string(got))
 		}
 
 	}
