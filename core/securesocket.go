@@ -7,14 +7,14 @@ import (
 	"io"     // 提供基础的 I/O 接口
 	"log"    // 新增日志包
 	"net"    // 提供网络相关功能
-	"time"   // 提供时间相关功能
+	"time"
 )
 
 // BufSize 定义读写操作时缓冲区的大小
 const BufSize = 1024
 
 // TIMEOUT 定义网络操作的超时时间
-const TIMEOUT = time.Minute
+const TIMEOUT = 10 * time.Second
 
 // SecureSocket 结构体表示一个安全的网络套接字，用于加密传输数据
 type SecureSocket struct {
