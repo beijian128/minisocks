@@ -1,69 +1,86 @@
-// cmd 包提供命令行相关的功能，主要负责配置文件的读取和保存
 package cmd
 
 import (
-	"encoding/json" // 提供 JSON 编码和解码功能
-	"log"           // 提供简单的日志记录功能
-	"os"            // 提供与操作系统交互的功能
+	"encoding/json"
+	"fmt"
+	"os"
+
+	"github.com/beijian128/minisocks/core"
+	"github.com/sirupsen/logrus"
 )
 
-// Config 结构体定义了 minisocks 的配置信息
+const (
+	defaultConfigPath = "./minisocks.json"
+	defaultListenAddr = ":7448"
+	defaultRemoteAddr = "ip:7448"
+)
+
+// Config 定义了 minisocks 的配置信息
 type Config struct {
-	// ListenAddr 是本地监听地址，对应 JSON 中的 "listen" 字段
-	ListenAddr string `json:"listen"`
-	// RemoteAddr 是远程服务地址，对应 JSON 中的 "remote" 字段
-	RemoteAddr string `json:"remote"`
-	// Password 是连接使用的密码，对应 JSON 中的 "password" 字段
-	Password string `json:"password"`
+	ListenAddr string `json:"listen"`   // 本地监听地址
+	RemoteAddr string `json:"remote"`   // 远程服务地址
+	Password   string `json:"password"` // 连接使用的密码
 }
 
-// 配置文件路径，用于存储 minisocks 的配置信息
-var configPath = "./minisocks.json"
+var (
+	logger = logrus.WithField("component", "cmd")
+)
 
-// SaveConfig 将配置信息保存到配置文件中
-func (config *Config) SaveConfig() {
-	// 将配置信息编码为格式化的 JSON 字符串，忽略可能的错误
-	configJson, _ := json.MarshalIndent(config, "", "	")
-	// 将 JSON 字符串写入配置文件
-	err := os.WriteFile(configPath, configJson, 0644)
+// Save 将配置信息保存到配置文件
+func (c *Config) Save() error {
+	configJSON, err := json.MarshalIndent(c, "", "    ")
 	if err != nil {
-		// 若写入失败，记录错误日志并终止程序
-		log.Fatalf("保存配置到文件 %s 出错: %v", configPath, err)
+		logger.WithError(err).Error("配置序列化失败")
+		return fmt.Errorf("配置序列化失败: %w", err)
 	}
-	// 若写入成功，记录成功日志
-	log.Printf("保存配置到文件 %s 成功\n", configPath)
+
+	if err := os.WriteFile(defaultConfigPath, configJSON, 0644); err != nil {
+		logger.WithFields(logrus.Fields{
+			"path":  defaultConfigPath,
+			"error": err,
+		}).Error("保存配置文件失败")
+		return fmt.Errorf("保存配置文件失败: %w", err)
+	}
+
+	logger.WithField("path", defaultConfigPath).Info("配置文件保存成功")
+	return nil
 }
 
-// ReadConfig 读取配置文件中的配置信息，如果文件不存在则使用默认配置
-func ReadConfig() *Config {
-	// 创建一个默认配置实例
+// LoadConfig 读取配置文件中的配置信息，如果文件不存在则使用默认配置
+func LoadConfig() (*Config, error) {
 	config := &Config{
-		ListenAddr: ":7448",
-		RemoteAddr: ":7448",
+		ListenAddr: defaultListenAddr,
+		RemoteAddr: defaultRemoteAddr,
+		Password:   core.GenerateCipherTable(),
 	}
 
 	// 检查配置文件是否存在
-	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
-		// 若文件存在，记录读取日志
-		log.Printf("从文件 %s 中读取配置\n", configPath)
-		// 打开配置文件
-		file, err := os.Open(configPath)
-		if err != nil {
-			// 若打开失败，记录错误日志并终止程序
-			log.Fatalf("打开文件 %s 出错:%s", configPath, err)
+	if _, err := os.Stat(defaultConfigPath); os.IsNotExist(err) {
+		logger.WithField("path", defaultConfigPath).Info("配置文件不存在，使用默认配置")
+		if err := config.Save(); err != nil {
+			return nil, err
 		}
-		// 函数结束时关闭文件
-		defer file.Close()
-
-		// 从文件中解析 JSON 数据到配置实例
-		err = json.NewDecoder(file).Decode(config)
-		if err != nil {
-			// 若解析失败，记录错误日志并终止程序
-			log.Fatalf("格式不合法的 JSON 配置文件:\n%s", file.Name())
-		}
+		return config, nil
 	}
-	// 保存配置信息到文件
-	config.SaveConfig()
-	// 返回配置实例
-	return config
+
+	file, err := os.Open(defaultConfigPath)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"path":  defaultConfigPath,
+			"error": err,
+		}).Error("打开配置文件失败")
+		return nil, fmt.Errorf("打开配置文件失败: %w", err)
+	}
+	defer file.Close()
+
+	if err := json.NewDecoder(file).Decode(config); err != nil {
+		logger.WithFields(logrus.Fields{
+			"path":  defaultConfigPath,
+			"error": err,
+		}).Error("解析配置文件失败")
+		return nil, fmt.Errorf("解析配置文件失败: %w", err)
+	}
+
+	logger.WithField("path", defaultConfigPath).Info("配置文件加载成功")
+	return config, nil
 }

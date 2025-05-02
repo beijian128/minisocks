@@ -7,9 +7,10 @@ import (
 )
 
 func TestSimpleCi_Encrypt(t *testing.T) {
+	secret := GenerateCipherTable()
 	var datas [][]byte
 	{
-		aes, err := NewSimple()
+		aes, err := NewSimple(secret)
 		assert.NoError(t, err)
 		for i := 0; i < 10; i++ {
 			got, err := aes.Encrypt([]byte(fmt.Sprintf("hello world %d", i)))
@@ -21,7 +22,7 @@ func TestSimpleCi_Encrypt(t *testing.T) {
 
 	{
 
-		aes, err := NewSimple()
+		aes, err := NewSimple(secret)
 		assert.NoError(t, err)
 		for i := 9; i >= 0; i-- {
 			got, err := aes.Decrypt(datas[i])
@@ -30,4 +31,5 @@ func TestSimpleCi_Encrypt(t *testing.T) {
 		}
 
 	}
+
 }
