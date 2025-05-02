@@ -90,86 +90,51 @@ func (server *LsServer) Close() {
 }
 
 // handleConn 处理来自本地端的连接，实现 socks5 协议
-// 参考文档：
-// https://www.ietf.org/rfc/rfc1928.txt
-// http://www.jianshu.com/p/172810a70fad
-// 参数 localConn 是与本地端建立的 TCP 连接
 func (server *LsServer) handleConn(localConn *net.TCPConn) {
 	log.Printf("DEBUG: 开始处理来自 %s 的本地连接", localConn.RemoteAddr().String())
-	// 函数结束时关闭与本地端的连接，注意此处未处理关闭时可能出现的错误
+
 	defer localConn.Close()
-	// 创建缓冲区用于接收数据
 	buf := make([]byte, 256)
 
-	/**
-	The localConn connects to the dstServer, and sends a ver
-	identifier/method selection message:
-			+----+----------+----------+
-			|VER | NMETHODS | METHODS  |
-			+----+----------+----------+
-			| 1  |    1     | 1 to 255 |
-			+----+----------+----------+
-	The VER field is set to X'05' for this ver of the protocol.  The
-	NMETHODS field contains the number of method identifier octets that
-	appear in the METHODS field.
-	*/
-	// 读取本地端发送的版本和方法选择消息并解密
-	log.Println("DEBUG: 读取本地端发送的版本和方法选择消息")
-	n, err := localConn.Read(buf)
-	data, err := server.Cipher.Decrypt(buf[:n])
-	// 只支持 Socks5 协议，若读取出错或版本号不为 0x05 则返回
-	if err != nil || data[0] != 0x05 {
-		if err != nil {
-			log.Printf("ERROR: 读取版本和方法选择消息出错: %v", err)
-		} else {
-			log.Println("ERROR: 不支持的协议版本，仅支持 Socks5")
+	{
+		// 读取本地端发送的版本和方法选择消息并解密
+		log.Println("DEBUG: 读取本地端发送的版本和方法选择消息")
+		n, err := localConn.Read(buf)
+		data, err := server.Cipher.Decrypt(buf[:n])
+		// 只支持 Socks5 协议，若读取出错或版本号不为 0x05 则返回
+		if err != nil || data[0] != 0x05 {
+			if err != nil {
+				log.Printf("ERROR: 读取版本和方法选择消息出错: %v", err)
+			} else {
+				log.Println("ERROR: 不支持的协议版本，仅支持 Socks5")
+			}
+			return
 		}
-		return
+		log.Println("DEBUG: 成功读取版本和方法选择消息，协议版本为 Socks5")
+		if data[1] != 0x01 {
+			log.Printf("ERROR: 不支持的请求类型: 0x%x，仅支持 CONNECT(0x01)", buf[1])
+			return
+		}
+		log.Println("DEBUG: 客户端请求类型为 CONNECT")
 	}
-	log.Println("DEBUG: 成功读取版本和方法选择消息，协议版本为 Socks5")
 
-	/**
-	The dstServer selects from one of the methods given in METHODS, and
-	sends a METHOD selection message:
-
-					+----+--------+
-					|VER | METHOD |
-					+----+--------+
-					| 1  |   1    |
-					+----+--------+
-	*/
-	// 不需要验证，直接发送验证通过消息并加密写入本地连接
-	log.Println("DEBUG: 发送验证通过消息")
-	data, _ = server.Cipher.Encrypt([]byte{0x05, 0x00})
-	_, err = localConn.Write(data)
-	if err != nil {
-		log.Printf("ERROR: 发送验证通过消息出错: %v", err)
-		return
+	{
+		// 不需要验证，直接发送验证通过消息并加密写入本地连接
+		log.Println("DEBUG: 发送验证通过消息")
+		data, _ := server.Cipher.Encrypt([]byte{0x05, 0x00})
+		_, err := localConn.Write(data)
+		if err != nil {
+			log.Printf("ERROR: 发送验证通过消息出错: %v", err)
+			return
+		}
+		log.Println("DEBUG: 验证通过消息发送成功")
 	}
-	log.Println("DEBUG: 验证通过消息发送成功")
-
-	/**
-	+----+-----+-------+------+----------+----------+
-	|VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
-	+----+-----+-------+------+----------+----------+
-	| 1  |  1  | X'00' |  1   | Variable |    2     |
-	+----+-----+-------+------+----------+----------+
-	*/
-
-	// CMD 代表客户端请求的类型，值长度为 1 个字节，有三种类型
-	// CONNECT X'01'
-	// 目前只支持 CONNECT 类型，若不是则返回
-	if data[1] != 0x01 {
-		log.Printf("ERROR: 不支持的请求类型: 0x%x，仅支持 CONNECT(0x01)", buf[1])
-		return
-	}
-	log.Println("DEBUG: 客户端请求类型为 CONNECT")
 
 	// 读取客户端请求的目标地址和端口信息并解密
 	log.Println("DEBUG: 读取客户端请求的目标地址和端口信息")
 	//n, err := server.DecodeRead(localConn, buf)
-	n, err = localConn.Read(buf)
-	data, err = server.Cipher.Decrypt(buf[:n])
+	n, err := localConn.Read(buf)
+	data, err := server.Cipher.Decrypt(buf[:n])
 	n = len(data)
 	// n 最短的长度为 7，情况为 ATYP=3 且 DST.ADDR 占用 1 字节，值为 0x0
 	// 若读取出错或长度不足则返回
