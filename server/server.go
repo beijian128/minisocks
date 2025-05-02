@@ -27,7 +27,7 @@ type LsServer struct {
 // 返回一个指向 LsServer 实例的指针
 func New(localAddr *net.TCPAddr) *LsServer {
 	log.Printf("DEBUG: 创建新的服务端实例，监听地址: %s", localAddr.String())
-	ci, _ := core.NewAES(nil)
+	ci, _ := core.NewSimple()
 	return &LsServer{
 		SecureSocket: &core.SecureSocket{
 			Cipher:    ci, // 创建编解码器实例

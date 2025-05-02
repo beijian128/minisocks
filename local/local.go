@@ -28,7 +28,7 @@ type LsLocal struct {
 // 返回一个指向 LsLocal 实例的指针。
 func New(localAddr, serverAddr *net.TCPAddr) *LsLocal {
 	log.Printf("DEBUG: 创建新的本地代理实例，本地地址: %s, 服务端地址: %s", localAddr.String(), serverAddr.String())
-	ci, _ := core.NewAES(nil)
+	ci, _ := core.NewSimple()
 	return &LsLocal{
 		SecureSocket: &core.SecureSocket{
 			Cipher:     ci,
