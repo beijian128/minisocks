@@ -13,7 +13,9 @@ var AESDefaultKey = "37943838a50d61c993e3e6f4f3bd729ff556b973db59852b4c050bb7c6e
 
 // AES 加密器结构体
 type AES struct {
-	key []byte
+	key   []byte
+	block cipher.Block
+	gcm   cipher.AEAD
 }
 
 // NewAES 创建一个新的 AES 加密器实例
@@ -24,7 +26,19 @@ func NewAES(key []byte) (*AES, error) {
 	}
 	switch len(key) {
 	case 16, 24, 32:
-		return &AES{key: key}, nil
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+		gcm, err := cipher.NewGCM(block)
+		if err != nil {
+			return nil, err
+		}
+		return &AES{
+			key:   key,
+			block: block,
+			gcm:   gcm,
+		}, nil
 	default:
 		return nil, errors.New("invalid key size, must be 16, 24 or 32 bytes")
 	}
@@ -32,44 +46,24 @@ func NewAES(key []byte) (*AES, error) {
 
 // Encrypt 加密数据
 func (a *AES) Encrypt(plaintext []byte) ([]byte, error) {
-	block, err := aes.NewCipher(a.key)
-	if err != nil {
+	nonce := make([]byte, a.gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, err
 	}
 
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-
-	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	ciphertext := a.gcm.Seal(nonce, nonce, plaintext, nil)
 	return ciphertext, nil
 }
 
 // Decrypt 解密数据
 func (a *AES) Decrypt(ciphertext []byte) ([]byte, error) {
-	block, err := aes.NewCipher(a.key)
-	if err != nil {
-		return nil, err
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	nonceSize := gcm.NonceSize()
+	nonceSize := a.gcm.NonceSize()
 	if len(ciphertext) < nonceSize {
 		return nil, errors.New("ciphertext too short")
 	}
 
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := a.gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, err
 	}

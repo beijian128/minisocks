@@ -26,3 +26,30 @@ func TestAES_Encrypt(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(got2))
 }
+
+func TestAES_Encrypt2(t *testing.T) {
+	var data []byte
+	{
+		aes, err := NewAES(nil)
+		assert.NoError(t, err)
+		for i := 0; i < 100; i++ {
+			got, err := aes.Encrypt([]byte("hello world"))
+			assert.NoError(t, err)
+			data = got
+		}
+
+	}
+
+	{
+
+		aes, err := NewAES(nil)
+		assert.NoError(t, err)
+		for i := 0; i < 10; i++ {
+			got, err := aes.Decrypt(data)
+			assert.NoError(t, err)
+			assert.Equal(t, "hello world", string(got))
+		}
+
+	}
+
+}
